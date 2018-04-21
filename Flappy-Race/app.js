@@ -21,9 +21,13 @@ server.listen(8080, () => console.log(__dirname));
 function onConnection(sock) {
     sock.on('match', function () {
         if (!matching) {
+            sock.leave(Object.keys(sock.rooms)[0]);
+            console.log(Object.keys(sock.rooms)[0]);
             sock.join(roomNo);
             matching = true;
         } else {
+            sock.leave(Object.keys(sock.rooms)[0]);
+            console.log(Object.keys(sock.rooms)[0]);
             sock.join(roomNo);
             io.in(roomNo).emit('matchStart');
             ++roomNo;
@@ -31,7 +35,15 @@ function onConnection(sock) {
         }
     });
     sock.on('pos', function (x, y) {
-        console.log(Object.keys(sock.rooms)[0]);
+        //console.log(Object.keys(sock.rooms)[0]);
         sock.to(Object.keys(sock.rooms)[0]).emit('pos', x, y);
+    });
+    sock.on('fire', function (x, y, direction) {
+        //console.log(x+'and'+y+'and'+direction);
+        io.in(Object.keys(sock.rooms)[0]).emit('firec', x, y, direction);
+    });
+    sock.on('end', function () {
+        //console.log(Object.keys(sock.rooms)[0]);
+        sock.to(Object.keys(sock.rooms)[0]).emit('end');
     });
 }

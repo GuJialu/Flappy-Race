@@ -3,8 +3,11 @@ var myGamePiece;
 var otherGamePiece;
 var myObstacles = [];
 var myScore;
+var projectiles = [];
 
 function startGame() {
+    projectiles = [];
+    //myGameArea.clear();
     myGamePiece = new component(10, 10, "blue", 10, 120);
     otherGamePiece = new component(10, 10, "red", 100, 120);
     myGamePiece.gravity = 0.05;
@@ -21,6 +24,7 @@ var myGameArea = {
         this.context = this.canvas.getContext("2d");
         document.body.insertBefore(this.canvas, document.body.childNodes[0]);
         this.frameNo = 0;
+        clearInterval(this.interval);
         this.interval = setInterval(updateGameArea, 60);
     },
     clear: function () {
@@ -50,32 +54,41 @@ function component(width, height, color, x, y, type) {
             ctx.fillRect(this.x, this.y, this.width, this.height);
         }
     }
-    this.newPos = function () {
+    this.updatePos = function () {
         this.gravitySpeed += this.gravity;
         this.x += this.speedX;
         this.y += this.speedY + this.gravitySpeed;
-        this.hitBottom();
+        this.bound();
     }
     this.posEmit = function () {
         sock.emit('pos', this.x, this.y);
     }
     this.posRecive = function () {
-        
-        sock.on('pos', function (x, y) {
-      
-            document.getElementById("demo").innerHTML = x + "and" + y;
-            otherGamePiece.x = x;
-            otherGamePiece.y = y;
+        sock.on('pos', (x, y) => {
+            this.x = x;
+            this.y = y;
         });
-
     }
-
-    this.hitBottom = function () {
-        var rockbottom = myGameArea.canvas.height - this.height;
-        if (this.y > rockbottom) {
-            this.y = rockbottom;
+    this.bound = function () {
+        var bottom = myGameArea.canvas.height - this.height;
+        var rightBound = myGameArea.canvas.width - this.width;
+        if (this.y > bottom) {
+            this.y = bottom;
             this.gravitySpeed = 0;
         }
+        if (this.x > rightBound) {
+            this.x = rightBound;
+            this.speedX = 0;
+        }
+        if (this.x < 0) {
+            this.x = 0;
+            this.speedX = 0;
+        }
+        if (this.y < 0) {
+            this.y = 0;
+            this.speedY = 0;
+        }
+
     }
     this.crashWith = function (otherobj) {
         var myleft = this.x;
@@ -97,40 +110,73 @@ function component(width, height, color, x, y, type) {
         if (this.gravitySpeed > -1) {
             this.gravitySpeed += accelrateY;
         }
-
+    }
+    this.attack1 = function () {
+        var direction = myGamePiece.x - otherGamePiece.x;
+        if (direction < 0) {
+            direction = 1;
+        } else {
+            direction = -1;
+        }
+        sock.emit('fire', this.x, this.y, direction);
+        sock.on('firec', (x, y, direction) => {
+            var projectile = new component(10, 10, "green", x+direction*(this.width+1), y);
+            projectile.speedX = direction;
+            projectiles.push(projectile);
+        });
     }
 }
 
 function updateGameArea() {
-    var x, height, gap, minHeight, maxHeight, minGap, maxGap;
-    for (i = 0; i < myObstacles.length; i += 1) {
-        if (myGamePiece.crashWith(myObstacles[i])) {
-            return;
-        }
-    }
+    checkCrash();
     myGameArea.clear();
     myGameArea.frameNo += 1;
-    if (myGameArea.frameNo == 1 || everyinterval(150)) {
-        x = myGameArea.canvas.width;
-        minHeight = 20;
-        maxHeight = 200;
-        height = Math.floor(Math.random() * (maxHeight - minHeight + 1) + minHeight);
-        //minGap = 50;
-        //maxGap = 200;
-        //gap = Math.floor(Math.random()*(maxGap-minGap+1)+minGap);
+    if (everyinterval(50)) {
+        myGamePiece.attack1();
     }
-
     myScore.text = "SCORE: " + myGameArea.frameNo;
     myScore.update();
-    myGamePiece.newPos();
+    myGamePiece.updatePos();
     myGamePiece.update();
     myGamePiece.posEmit();
-    sock.on('pos', function (x, y) {
-        document.getElementById("demo").innerHTML = x + "and" + y;
-        otherGamePiece.x = x;
-        otherGamePiece.y = y;
-    });
+
+    otherGamePiece.posRecive();
     otherGamePiece.update();
+
+    updateProjectiles();
+}
+
+function updateProjectiles() {
+    for (i = 0; i < projectiles.length; i += 1) {
+        projectiles[i].updatePos();
+        projectiles[i].update();
+    }
+}
+
+function checkCrash() {
+    for (i = 0; i < projectiles.length; i += 1) {
+        if (myGamePiece.crashWith(projectiles[i])) {
+            clearInterval(myGameArea.interval);
+            document.getElementById("demo").innerHTML = "You lose";
+            projectiles = [];
+            document.getElementById('match').style.display = 'block';
+            break;
+        }
+        if (otherGamePiece.crashWith(projectiles[i])) {
+            clearInterval(myGameArea.interval);
+            document.getElementById("demo").innerHTML = "You win";
+            projectiles = [];
+            document.getElementById('match').style.display = 'block';
+            break;
+        }
+    }
+}
+
+function endGame() {
+    sock.on('end', (x, y, direction) => {
+        document.getElementById("demo").innerHTML = "You win";
+        clearInterval(myGameArea.interval);
+    });
 }
 
 function everyinterval(n) {
@@ -157,6 +203,9 @@ document.addEventListener('keypress', (event) => {
     if (keyName == 'a') {
         myGamePiece.move(-0.1, 0);
     }
+    if (keyName == 'j') {
+        myGamePiece.attack1();
+    }
 });
 
 function test() {
@@ -164,8 +213,11 @@ function test() {
 }
 
 document.getElementById('match').addEventListener('click', function () {
+    document.getElementById('match').style.display = 'none';
     sock.emit('match');
     sock.on('matchStart', function () {
         startGame();
     });
 });
+//otherGamePiece.posRecive();
+//fireRecive();
