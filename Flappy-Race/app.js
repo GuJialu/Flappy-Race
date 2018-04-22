@@ -12,6 +12,9 @@ var matching = false;
 
 var roomNo = 2;
 
+var users = new Map();
+users.set("sam:123", 0);
+
 io.on('connection', onConnection);
 
 app.use(express.static(__dirname + '/'));
@@ -22,13 +25,11 @@ function onConnection(sock) {
     sock.on('match', function () {
         if (!matching) {
             sock.leave(Object.keys(sock.rooms)[0]);
-            console.log(Object.keys(sock.rooms)[0]);
             sock.join(roomNo);
             matching = true;
         } else {
-            sock.leave(Object.keys(sock.rooms)[0]);
-            console.log(Object.keys(sock.rooms)[0]);
             sock.join(roomNo);
+            sock.leave(Object.keys(sock.rooms)[0]);
             io.in(roomNo).emit('matchStart');
             ++roomNo;
             matching = false;
@@ -39,11 +40,21 @@ function onConnection(sock) {
         sock.to(Object.keys(sock.rooms)[0]).emit('pos', x, y);
     });
     sock.on('fire', function (x, y, direction) {
-        //console.log(x+'and'+y+'and'+direction);
+        console.log(x+'and'+y+'and'+direction);
         io.in(Object.keys(sock.rooms)[0]).emit('firec', x, y, direction);
     });
-    sock.on('end', function () {
-        //console.log(Object.keys(sock.rooms)[0]);
-        sock.to(Object.keys(sock.rooms)[0]).emit('end');
+    sock.on('login', function (nameAndPass) {
+        console.log(nameAndPass);
+        if(users.has(nameAndPass)){
+            sock.emit('login', nameAndPass, users.get(nameAndPass));
+        } else {
+            sock.emit('login', 'guest');
+        }
+    });
+    sock.on('score', function (nameAndPass, score) {
+        console.log(nameAndPass + score);
+        if(users.has(nameAndPass)){
+            users.set(nameAndPass, score);
+        }
     });
 }

@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Login</title>
+        <link rel="stylesheet" type="text/css" href="style.css">
+    </head>
+
+    <body>
+        
+        <h1>Login</h1>
+        <center>
+        		<div class="form-control">
+        		    <label>Username</label>
+        			<input type="text" id="username">
+                </div>
+                <div class="form-control">
+        			<label>Password</label>
+        			<input type="password" id="password">
+                </div>
+                <div class="form-control">
+        		    <button type="submit" class="btn btn-warning brn-log" onclick="connect()">Login</button>
+                </div>
+                <p id="demo"></p>
+                <script src="/socket.io/socket.io.js"></script>
+                <script>
+                    function connect() {
+                        var socket = io();
+                        var username = document.getElementById("username").value;
+                        var password = document.getElementById("password").value;
+                        socket.emit('receiveuser', username, password);
+                        socket.on('resp', (res) => {
+                            document.getElementById("demo").innerHTML = res;
+                        });
+                    }
+                </script>
+        		<p>Need an account? <a href="./signup.html">signup</a></p>
+                <p>Back to homepage <a href="./index.html">homepage</a></p>
+        </center>
+    </body>
+    
+</html>
